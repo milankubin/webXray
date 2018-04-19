@@ -5,6 +5,12 @@ import json
 import time
 import random
 import sqlite3
+import subprocess
+
+import getpass
+import keyring
+from Crypto.Cipher import AES
+from Crypto.Protocol.KDF import PBKDF2
 
 # check if non-standard packages are installed
 try:
@@ -55,9 +61,60 @@ class ChromeDriver:
 		# Set ua if we have it, see get_ua_for_headless
 		#	for details
 		self.ua = ua
-		
+
 		return None
+
 	# init
+
+	def secret_storage_key(self):
+		# If running Chrome on OSX
+		if sys.platform == 'darwin':
+			my_pass = keyring.get_password('Chrome Safe Storage', 'Chrome')
+			my_pass = my_pass.encode('utf8')
+			iterations = 1003
+			cookie_file = os.path.expanduser(
+				'~/Library/Application Support/Google/Chrome/Default/Cookies'
+			)
+
+		# If running Chromium on Linux
+		elif sys.platform == 'linux':
+			my_pass = 'peanuts'.encode('utf8')
+			iterations = 1
+			cookie_file = os.path.expanduser(
+				'~/.config/chromium/Default/Cookies'
+			)
+		else:
+			raise Exception("This script only works on OSX or Linux.")
+
+
+		return my_pass
+
+	# Function to get rid of padding
+	def clean_cookie(x):
+		return x[:-x[-1]].decode('utf8')
+
+	def decrypt_cookie(self, val, storage_key):
+		# Trim off the 'v10' that Chrome/ium prepends
+		encrypted_value = val[3:]
+
+		# Default values used by both Chrome and Chromium in OSX and Linux
+		salt = b'saltysalt'
+		iv = b' ' * 16
+		length = 16
+
+		# On Mac, replace MY_PASS with your password from Keychain
+		# On Linux, replace MY_PASS with 'peanuts'
+		# my_pass = MY_PASS
+		# my_pass = my_pass.encode('utf8')
+
+		# 1003 on Mac, 1 on Linux
+		iterations = 1003
+
+		key = PBKDF2(storage_key, salt, length, iterations)
+		cipher = AES.new(key, AES.MODE_CBC, IV=iv)
+
+		decrypted = cipher.decrypt(encrypted_value)
+		return self.clean_cookie(decrypted)
 
 	def create_chromedriver(self):
 		"""
@@ -83,8 +140,8 @@ class ChromeDriver:
 		if self.headless:
 			chrome_options.add_argument('headless')
 			chrome_options.add_argument('disable-gpu')
-			window_x = random.randrange(1050,1920)
-			window_y = random.randrange(900,1080)
+			window_x =  3440 # random.randrange(1050,1920)
+			window_y = 1440
 			chrome_options.add_argument('window-size=%sx%s' % (window_x,window_y))
 
 		# if we have a ua set it here
@@ -306,14 +363,16 @@ class ChromeDriver:
 		# get all the cookies
 		# 	the selenium get_cookies method does not return third-party cookies
 		#	so we open the cookie db directly from the chrome profile
-		#	note that in headless mode this does not work in chrome versions
+		#	note that in headless mode this does not work in chrome versions  c
 		#	prior to 64.0.3254.0 and no cookies will be returned
 		cookies = []
 		try:
+			decrypt_key = self.secret_storage_key
 			conn = sqlite3.connect(driver.capabilities['chrome']['userDataDir']+'/Default/Cookies')
 			c = conn.cursor()
 			c.execute("SELECT name,secure,path,host_key,expires_utc,httponly,value FROM cookies")
 			for cookie in c.fetchall():
+
 				cookies.append({
 					'name': 		cookie[0],
 					'secure':		cookie[1],

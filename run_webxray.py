@@ -53,14 +53,14 @@ browser_wait = 30
 #
 #	note that with manual tweaking the pool can be larger than the number
 #		of available cores, but proceed with caution
-pool_size = 1
+pool_size = 3
 
 # DATABASE ENGINE SELECTION
 # 	db_engine can be 'mysql', 'postgres', or 'sqlite'
 #	sqlite requires no configuation, but mysql and postgres
 #		need user/pw set up in the relevant driver in the 
 #		./webxray directory
-db_engine = 'sqlite'
+db_engine = 'mysql'
 
 # set up database connection
 if db_engine == 'mysql':
@@ -287,7 +287,7 @@ def collect(db_name, pages_file_name):
 	"""
 
 	from webxray.Collector import Collector
-	collector = Collector(db_engine, db_name, pages_file_name, [browser_type], browser_wait)
+	collector = Collector(db_engine, db_name, pages_file_name, [browser_type], browser_wait, 1, 30)
 	collector.run(pool_size)
 # collect
 

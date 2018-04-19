@@ -38,7 +38,7 @@ class MySQLDriver:
 		# modify this per your install
 		mysql_config = {
 			'user': 'root',
-			'password': '',
+			'password': 'root',
 			'host': '127.0.0.1',
 			'database': self.db_name,
 			'raise_on_warnings': False,
